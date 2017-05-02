@@ -842,6 +842,47 @@ class MusicBot(discord.Client):
         except:
             raise exceptions.CommandError('Invalid URL provided:\n{}\n'.format(server_link), expire_in=30)
 
+    async def cmd_autoplay_add(self, player, channel, author, permissions, leftover_args, song_url):
+        """
+        Usage:
+            {command_prefix}autoplay_add song_link
+            Adds the song to the auto playlist
+        :return:
+        """
+        song_url = song_url.strip('<>')
+
+        await self.send_typing(channel)
+
+        try:
+            info = await self.downloader.extract_info(player.playlist.loop, song_url, download=False, process=False)
+        except Exception as e:
+            raise exceptions.CommandError(e, expire_in=30)
+
+        if not info:
+            raise exceptions.CommandError("That video cannot be played. It will not be added to the autoplaylist,", expire_in=30)
+        self.autoplaylist.append(song_url)
+        reply_text = "Added song to autoplay playlist: %s" % song_url
+        write_file(self.config.auto_playlist_file, self.autoplaylist)
+        return Response(reply_text, delete_after=30)
+
+    async def cmd_autoplay_remove(self, player, channel, author, permissions, leftover_args, song_url):
+        """
+        Usage:
+            {command_prefix}autoplay_remove song_link
+            Removes the song from the auto playlist
+        """
+        song_url = song_url.strip('<>')
+
+        await self.send_typing(channel)
+
+        if song_url in self.autoplaylist:
+            self.autoplaylist.remove(song_url)
+            reply_text = "Removed song %s from autoplaylist" % song_url
+            write_file(self.config.auto_playlist_file, self.autoplaylist)
+
+            return Response(reply_text, delete_after=30)
+        return Response("The video you are trying to remove is currently not in the autoplaylist.", delete_after=30)
+
     async def cmd_play_next(self, player, channel, author, permissions, leftover_args, song_url):
         """
         Usage:
@@ -1458,7 +1499,7 @@ class MusicBot(discord.Client):
                 np_text = "Now Playing: **%s** added by **%s** %s\n" % (
                     player.current_entry.title, player.current_entry.meta['author'].name, prog_str)
             else:
-                np_text = "Now Playing: **%s** %s\n" % (player.current_entry.title, prog_str)
+                np_text = "Now Playing: **%s** %s\n[%s]\n" % (player.current_entry.title, prog_str, player.current_entry.url)
 
             self.server_specific_data[server]['last_np_msg'] = await self.safe_send_message(channel, np_text)
             await self._manual_delete_check(message)
